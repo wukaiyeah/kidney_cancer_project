@@ -1,0 +1,4 @@
+Image,Mask
+/home/wukai/Desktop/RCC_classification/CT_images/images/case00209_0000.nii.gz,/home/wukai/Desktop/RCC_classification/CT_images/labels/case00209.nii.gz
+/home/wukai/Desktop/RCC_classification/CT_images/images/case00208_0000.nii.gz,/home/wukai/Desktop/RCC_classification/CT_images/labels/case00208.nii.gz
+/home/wukai/Desktop/RCC_classification/CT_images/images/case00207_0000.nii.gz,/home/wukai/Desktop/RCC_classification/CT_images/labels/case00207.nii.gz
