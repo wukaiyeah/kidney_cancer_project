@@ -31,12 +31,13 @@ if __name__ == '__main__':
 
     ## step1: kidney and tumor segmentation for raw CT images ##
     ## segmentation model was supported by nnUNet: https://github.com/MIC-DKFZ/nnunet, and trained before
-
+    '''
     cmd = 'nnUNet_predict -i %s -o %s -tr nnUNetTrainerV2 -ctr nnUNetTrainerV2CascadeFullRes -m 3d_lowres -p nnUNetPlansv2.1 -t Task100_KidneyTumor'%(cf.image_dir, cf.mask_dir)
     os.system(cmd)
-
+    '''
     ## step2: feature extraction by radiomics and dimension reduction ##
     # 1. Pyradiomics
+    '''
     cf = pyradiomics_run(cf)
     radiomics_feature_table = pyradiomics_out_process(cf)
     radiomics_feature_table.to_csv(os.path.join(cf.radiomics_dir, 'radiomics_features.csv'))
@@ -99,7 +100,7 @@ if __name__ == '__main__':
         pool.join()
 
     print('-------crop tumor images completed------')
-
+    '''
     # 5) dimension reduction
     files_dir = glob.glob(os.path.join(cf.cropped_dir, '*.npz'))
     files_id = [file_dir.split('/')[-1].replace('.npz','') for file_dir in files_dir]

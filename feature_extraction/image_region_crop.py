@@ -14,7 +14,7 @@ def crop_image(file_dir, cf):
     all_data = np.load(file_dir)['data']
     image = all_data[0]
     mask = all_data[1]
-    assert 2 in mask, 'The label 2 not in mask of %s'%(file_id)
+    #assert 2 in mask, 'The label 2 not in mask of %s'%(file_id)
     #计算需要剪裁区域坐标
     crop_boxes, new_mask = compute_crop_boxes_coord(mask, cf)
     # 提取mask前景对应的image
@@ -43,39 +43,62 @@ def compute_crop_boxes_coord(mask, cf):
     kidney_mask = np.zeros_like(mask)
     kidney_mask[mask == 1] = 1
 
-    # tumor取最大的一个
-    labels = label(tumor_mask)
-    regions = regionprops(labels)
-    tumor_index = np.argmax([region.area for region in regions])
-    tumor_region = regions[tumor_index]
-    # kidney取最大的前两个
-    labels = label(kidney_mask)
-    regions = regionprops(labels)
-    kidney_index = np.argsort([region.area for region in regions])[::-1][:2]
-    kidney_regions = [regions[i] for i in kidney_index]
+    if 1 in tumor_mask:
+        # tumor取最大的一个
+        labels = label(tumor_mask)
+        regions = regionprops(labels)
+        tumor_index = np.argmax([region.area for region in regions])
+        tumor_region = regions[tumor_index]
 
-    # 判断哪个肾为肿瘤所在肾
-    for kidney_region in kidney_regions:
-        intersection = compute_intersection_3D(tumor_region.bbox, kidney_region.bbox)
-        if intersection > 0:
+        # kidney取最大的前两个
+        labels = label(kidney_mask)
+        regions = regionprops(labels)
+        kidney_index = np.argsort([region.area for region in regions])[::-1][:2]
+        kidney_regions = [regions[i] for i in kidney_index]
+
+        # 判断哪个肾为肿瘤所在肾
+        for kidney_region in kidney_regions:
+            intersection = compute_intersection_3D(tumor_region.bbox, kidney_region.bbox)
+            if intersection > 0:
+                kidney_tumor_loc_region = kidney_region
+
+        try: # 判断取得kidney
+            kidney_tumor_loc_region
+        except:
             kidney_tumor_loc_region = kidney_region
-    try: # 判断取得kidney
-        kidney_tumor_loc_region
-    except:
-        print('Tumor not attached to any kidney!')
+            print('Tumor not attached to any kidney!')
 
-    # 合并肿瘤与病灶肾
-    new_mask = np.zeros_like(mask)
-    for coord in tumor_region.coords:
-        new_mask[coord.tolist()[0],coord.tolist()[1],coord.tolist()[2]] = 1
-    for coord in kidney_tumor_loc_region.coords:
-        new_mask[coord.tolist()[0],coord.tolist()[1],coord.tolist()[2]] = 1
-    # 计算target区域中心点坐标
-    new_mask = binary_closing(new_mask)
-    labels = label(new_mask)
-    regions = regionprops(labels)
-    assert len(regions) == 1, 'Wrong New mask with tumor and kidney'
-    center_point = np.round(np.array(regions[0].centroid)) # 质心坐标
+        # 合并肿瘤与病灶肾
+        new_mask = np.zeros_like(mask)
+        for coord in tumor_region.coords:
+            new_mask[coord.tolist()[0],coord.tolist()[1],coord.tolist()[2]] = 1
+        for coord in kidney_tumor_loc_region.coords:
+            new_mask[coord.tolist()[0],coord.tolist()[1],coord.tolist()[2]] = 1
+        # 计算target区域中心点坐标
+        new_mask = binary_closing(new_mask)
+        labels = label(new_mask)
+        regions = regionprops(labels)
+        #assert len(regions) == 1, 'Wrong New mask with tumor and kidney'
+        center_point = np.round(np.array(regions[0].centroid)) # 质心坐标
+    else:
+        # kidney取最大的前一个
+        labels = label(kidney_mask)
+        regions = regionprops(labels)
+        kidney_index = np.argsort([region.area for region in regions])[::-1][0]
+        kidney_regions = regions[0]
+
+
+        # 合并肿瘤与病灶肾
+        new_mask = np.zeros_like(mask)
+        for coord in kidney_regions.coords:
+            new_mask[coord.tolist()[0],coord.tolist()[1],coord.tolist()[2]] = 1
+
+        # 计算target区域中心点坐标
+        new_mask = binary_closing(new_mask)
+        labels = label(new_mask)
+        regions = regionprops(labels)
+        assert len(regions) == 1, 'Wrong New mask with tumor and kidney'
+        center_point = np.round(np.array(regions[0].centroid)) # 质心坐标
 
     # 计算需剪切box的坐标
     crop_boxes = [coord - cf.crop_size[i]/2 for i,coord in enumerate(center_point)] + [coord + cf.crop_size[i]/2 for i,coord in enumerate(center_point)]

@@ -6,6 +6,7 @@ reture a dict(.pkl) file
 
 import os
 import numpy as np
+import pandas as pd
 import pickle
 import glob
 from multiprocessing import Pool
@@ -84,77 +85,27 @@ def tsne_reduce_dimension(file_dir):
     image_feature = np.reshape(image_feature, (1,-1))
     return  {file_id:image_feature}
 
+def pca_experiments(file_dir,seed):
+    assert os.path.exists(file_dir),'Can not find file in %s'%(file_dir)
+    image = np.load(file_dir)['data']
+    image = np.reshape(image, (64,-1))
+    # pca
+    pca = PCA(4, random_state= seed, svd_solver='full').fit(image)
+    image_feature = pca.transform(image)
+    image_feature = np.reshape(image_feature, (1,-1))
+    pc1, pc2,pc3 = image_feature[0][0], image_feature[0][1],image_feature[0][2]
+    print(pc1, pc2, pc3)
+    return pc1, pc2,pc3
+
 
 if __name__ == '__main__':
-    base_dir = '/share/Data01/wukai/rcc_classify/xgboost'
-    images_source = '/share/service04/wukai/CT_image/testset/images_cropped_tumor'
-    files_dir = glob.glob(os.path.join(images_source, '*.npz'))
-    print('Need process %d files'%len(files_dir))
-    files_id = [file_dir.split('/')[-1].replace('.npz','') for file_dir in files_dir]
+    file_dir = '/media/wukai/Data01/RCC_classification/kidney_cancer_project/CT_images/images_cropped/case00209.npz'
+    pca_reduce_dimension(file_dir)
+    pca_res_table = pd.DataFrame(columns=['PC1','PC2','PC3'])
+    for seed in range(1,1001):
+        pc1, pc2,pc3 = pca_experiments(file_dir, seed)
+        print(pc1, pc2, pc3)
+        #pca_res_table = pd.concat((pca_res_table,pd.DataFrame([[pc1,pc2,pc3]], columns=['PC1','PC2','PC3'])), axis=0)
 
-    # multiple process
-
-    with Pool(30) as pool:
-        features_list = pool.map(partial(pca_reduce_dimension), files_dir) # 并行
-        pool.close()
-        pool.join()
-    images_pca_features = {}
-    for features_dict in features_list:
-        images_pca_features.update(features_dict)
-    with open(os.path.join(base_dir, 'images_pca_testset_tumor_features.pkl'), 'wb') as OUT:
-        pickle.dump(images_pca_features, OUT)
-
-    with Pool(30) as pool:
-        features_list = pool.map(partial(svd_reduce_dimension), files_dir) # 并行
-        pool.close()
-        pool.join()
-    images_svd_features = {}
-    for features_dict in features_list:
-        images_svd_features.update(features_dict)
-    with open(os.path.join(base_dir, 'images_svd_testset_tumor_features.pkl'), 'wb') as OUT:
-        pickle.dump(images_svd_features, OUT)
-    '''
-    with Pool(10) as pool:
-        features_list = pool.map(partial(isomap_reduce_dimension), files_dir) # 并行
-        pool.close()
-        pool.join()
-    images_svd_features = {}
-    for features_dict in features_list:
-        images_svd_features.update(features_dict)
-    with open(os.path.join(base_dir, 'images_all_isomap_ori_features.pkl'), 'wb') as OUT:
-        pickle.dump(images_svd_features, OUT)
-
-    with Pool(10) as pool:
-        features_list = pool.map(partial(ica_reduce_dimension), files_dir) # 并行
-        pool.close()
-        pool.join()
-    images_ica_features = {}
-    for features_dict in features_list:
-        images_ica_features.update(features_dict)
-    with open(os.path.join(base_dir, 'images_ica_ori_features.pkl'), 'wb') as OUT:
-        pickle.dump(images_ica_features, OUT)
-
-
-    with Pool(10) as pool:
-        features_list = pool.map(partial(lle_reduce_dimension), files_dir) # 并行
-        pool.close()
-        pool.join()
-    images_lle_features = {}
-    for features_dict in features_list:
-        images_lle_features.update(features_dict)
-    with open(os.path.join(base_dir, 'images_lle_ori_features.pkl'), 'wb') as OUT:
-        pickle.dump(images_lle_features, OUT)
-
-
-    with Pool(30) as pool:
-        features_list = pool.map(partial(tsne_reduce_dimension), files_dir) # 并行
-        pool.close()
-        pool.join()
-    images_tsne_features = {}
-    for features_dict in features_list:
-        images_tsne_features.update(features_dict)
-    with open(os.path.join(base_dir, 'images_tsne_tumor_features.pkl'), 'wb') as OUT:
-        pickle.dump(images_tsne_features, OUT)
-    '''
-    print('Complete')
-
+    #pca_res_table.to_csv('/home/wukai/Desktop/RCC_classification/kidney_cancer_project/pca_randomness_test.csv', index=0)
+    
