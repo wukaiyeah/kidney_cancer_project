@@ -9,13 +9,6 @@ from mlxtend.evaluate import mcnemar_table, mcnemar
 from imblearn.combine import SMOTEENN,SMOTETomek
 from collections import Counter
 
-def benign_sample_remove(datatable, clinic_info):
-    removed_cases_list = list(clinic_info.loc[clinic_info['stage_name'] == '0'].index)
-    filter_bool = [False if file_id.split('/')[0] in removed_cases_list else True for file_id in datatable.index]
-    datatable = datatable.loc[filter_bool,:]
-    return datatable
-
-
 
 if __name__ == '__main__':
     base_dir = '/media/wukai/Data01/RCC_classification/kidney_cancer_project/xgboost'
@@ -32,29 +25,41 @@ if __name__ == '__main__':
     test_feature = np.array(test_table.iloc[:,2:])
     test_stage_label = np.array(test_table.iloc[:,1])
 
+    smote_enn = SMOTETomek(random_state=0)
+    train_feature,train_stage_label = smote_enn.fit_resample(train_feature,train_stage_label)
+    #test_feature,test_stage_label = smote_enn.fit_resample(test_feature,test_stage_label)
+
     # for tumor stage cls
-    '''
-        model = XGBClassifier( scale_pos_weight = 0.7,
-                            #learning_rate = 0.10, 
-                            n_estimators=200,
-                            max_depth = 7,
-                            subsample = 0.70,
-                            reg_lambda = 5,
-                            num_boost_round = 60,
-                            min_child_weight = 0.8,
-                            colsample_bytree=1)'''
 
     eval_set = [(test_feature, test_stage_label)]
-        model = XGBClassifier( scale_pos_weight = 0.7,
+
+    model = XGBClassifier(  scale_pos_weight = 0.2,
+                            #learning_rate = 0., 
+                            n_estimators=100,
+                            max_depth = 8,
+                            subsample = 1,
+                            reg_lambda = 30,
+                            gamma = 0.03,
+                            num_boost_round = 300,
+                            min_child_weight = 0.98,
+                            colsample_bytree=1
+                            )
+    '''
+    model = XGBClassifier(  scale_pos_weight = 0.2,
                             #learning_rate = 0.10, 
-                            n_estimators=200,
-                            max_depth = 7,
-                            subsample = 0.70,
-                            reg_lambda = 5,
-                            num_boost_round = 60,
-                            min_child_weight = 0.8,
-                            colsample_bytree=1)
-    model.fit(train_feature, train_stage_label, early_stopping_rounds=100, eval_metric=['auc','rmsle'], eval_set=eval_set, verbose=True)
+                            n_estimators=300,
+                            max_depth = 8,
+                            #subsample = 0.9,
+                            reg_lambda = 30,
+                            gamma = 0.03,
+                            num_boost_round = 300,
+                            #min_child_weight = 0.8,
+                            colsample_bytree=1
+                            )
+    '''
+
+                            
+    model.fit(train_feature, train_stage_label, early_stopping_rounds=100, eval_metric=['auc','logloss','error'], eval_set=eval_set, verbose=True)
     y_pred = model.predict_proba(test_feature)
     y_pred_proba = y_pred[:,1] 
     y_pred_class = [0 if proba < 0.5 else 1 for proba in y_pred_proba ]
@@ -72,6 +77,12 @@ if __name__ == '__main__':
     print('Stage auc score label:%.2f%%' %(Auc_score*100.0))
     print('Stage auc score label:%.2f%%' %(Auc_score*100.0))
     print(confusion_matrix(test_stage_label,y_pred_class ))
+
+    test_pred_table = pd.concat((pd.DataFrame(test_stage_label), pd.DataFrame(y_pred_proba)), axis=1)
+    test_pred_table.columns = ['truth','proba']
+    test_pred_table.to_csv('stage_predict_proba_resampled_train.csv', index=0)
+
+
     # McNemer's test
     y_target = test_stage_label
     y_model1 = np.array(y_pred_class)
@@ -79,7 +90,9 @@ if __name__ == '__main__':
     tb = mcnemar_table(y_target=y_target, 
                    y_model1=y_model1, 
                    y_model2=y_model2)
-    chi2, p = mcnemar(ary=tb)
+    chi2, p = mcnemar(ary=tb, corrected=False)
+    print(tb)
     print('chi-squared:', chi2)
     print('McNemer p-value:', p)
+    print('ok')
     # save model to file

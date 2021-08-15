@@ -22,49 +22,36 @@ if __name__ == '__main__':
     test_feature = np.load(test_feature_dir)['data']
     test_label = np.load(test_label_dir)['data']
 
-    '''
-    #x_train,x_test,y_train,y_test = train_test_split(feature, label, test_size = 0.1)  
-    dtrain = xgb.DMatrix(train_feature, train_label)
-    dtest  = xgb.DMatrix(test_feature, train_label)
-
-    param = {'objective':'multi:softmax',
-            'learning_rate':0.001,
-            "eval_metric":"mlogloss",
-            'eta':0.1,
-            'max_depth':3,
-            'nthread':2,
-            'num_class':3,
-            'seed':1234}
-    # use softmax multi-class classification
-    cv_res= xgb.cv(param, dtrain, early_stopping_rounds=100,nfold=5,show_stdv=True)
-    print('Best number of trees = {}'.format(cv_res.shape[0]))
-    print(cv_res)
-    '''
+    smote_enn = SMOTETomek(random_state=0)
+    train_feature,train_label = smote_enn.fit_resample(train_feature,train_label)
+    #test_feature,test_label = smote_enn.fit_resample(test_feature,test_label)
 
 
     # for tumor subtype cls
-    model = XGBClassifier(learning_rate = 0.08, 
-                            scale_pos_weight = 0.86,
+    model = XGBClassifier(
+                            scale_pos_weight = 1,
                             n_estimators=300,
-                            max_depth = 8,
+                            #max_depth = 7,
                             subsample = 0.74,
-                            reg_lambda = 1.1,
-                            num_boost_round = 100,
+                            reg_lambda = 50,
+                            gamma = 0.02,
+                            num_boost_round = 300,
                             min_child_weight = 1,
                             colsample_bytree=1)
     '''
-    model = XGBClassifier(learning_rate = 0.08, 
-                            scale_pos_weight = 0.86,
+    model = XGBClassifier(
+                            scale_pos_weight = 1,
                             n_estimators=300,
-                            max_depth = 8,
+                            #max_depth = 10,
                             subsample = 0.74,
-                            reg_lambda = 1.1,
-                            num_boost_round = 100,
+                            reg_lambda = 50,
+                            gamma = 0.02,
+                            num_boost_round = 300,
                             min_child_weight = 1,
                             colsample_bytree=1)
     '''
     eval_set = [(test_feature, test_label)]
-    model.fit(train_feature, train_label, early_stopping_rounds=100, eval_metric=['auc'], eval_set=eval_set, verbose=True)
+    model.fit(train_feature, train_label, early_stopping_rounds=200, eval_metric=['auc','error','rmsle'], eval_set=eval_set, verbose=True)
 
     y_pred = model.predict_proba(test_feature)
     y_pred_proba = y_pred[:,1] 
@@ -81,6 +68,12 @@ if __name__ == '__main__':
     Auc_score = roc_auc_score(test_label, y_pred_proba)
     print('Subtype auc score label:%.2f%%' %(Auc_score*100.0))
     print(confusion_matrix(test_label,y_pred_class ))
+
+    test_pred_table = pd.concat((pd.DataFrame(test_label), pd.DataFrame(y_pred_proba)), axis=1)
+    test_pred_table.columns = ['truth','proba']
+    test_pred_table.to_csv('grade_predict_proba_resampled_train.csv', index=0)
+    # save model to file
+
     # McNemer's test
     y_target = test_label
     y_model1 = np.array(y_pred_class)
@@ -94,4 +87,3 @@ if __name__ == '__main__':
     print('McNemer p-value:', p)
     print('complete')
     # save model to file
-

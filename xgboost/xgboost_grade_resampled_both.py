@@ -22,6 +22,10 @@ if __name__ == '__main__':
     test_feature = np.load(test_feature_dir)['data']
     test_label = np.load(test_label_dir)['data']
 
+    smote_enn = SMOTETomek(random_state=0)
+    train_feature,train_label = smote_enn.fit_resample(train_feature,train_label)
+    test_feature,test_label = smote_enn.fit_resample(test_feature,test_label)
+
     '''
     #x_train,x_test,y_train,y_test = train_test_split(feature, label, test_size = 0.1)  
     dtrain = xgb.DMatrix(train_feature, train_label)
@@ -43,8 +47,8 @@ if __name__ == '__main__':
 
 
     # for tumor subtype cls
-    model = XGBClassifier(learning_rate = 0.08, 
-                            scale_pos_weight = 0.86,
+    model = XGBClassifier(
+                            scale_pos_weight = 1,
                             n_estimators=300,
                             max_depth = 8,
                             subsample = 0.74,
@@ -64,7 +68,7 @@ if __name__ == '__main__':
                             colsample_bytree=1)
     '''
     eval_set = [(test_feature, test_label)]
-    model.fit(train_feature, train_label, early_stopping_rounds=100, eval_metric=['auc'], eval_set=eval_set, verbose=True)
+    model.fit(train_feature, train_label, early_stopping_rounds=100, eval_metric=['auc','error'], eval_set=eval_set, verbose=True)
 
     y_pred = model.predict_proba(test_feature)
     y_pred_proba = y_pred[:,1] 
@@ -81,17 +85,9 @@ if __name__ == '__main__':
     Auc_score = roc_auc_score(test_label, y_pred_proba)
     print('Subtype auc score label:%.2f%%' %(Auc_score*100.0))
     print(confusion_matrix(test_label,y_pred_class ))
-    # McNemer's test
-    y_target = test_label
-    y_model1 = np.array(y_pred_class)
-    y_model2 = np.ones_like(y_model1)
-    tb = mcnemar_table(y_target=y_target, 
-                   y_model1=y_model1, 
-                   y_model2=y_model2)
-    chi2, p = mcnemar(ary=tb,corrected = False,exact=False)
-    print(tb)
-    print('chi-squared:', chi2)
-    print('McNemer p-value:', p)
-    print('complete')
+
+    test_pred_table = pd.concat((pd.DataFrame(test_label), pd.DataFrame(y_pred_proba)), axis=1)
+    test_pred_table.columns = ['truth','proba']
+    test_pred_table.to_csv('grade_predict_proba_resampled_both.csv', index=0)
     # save model to file
 
